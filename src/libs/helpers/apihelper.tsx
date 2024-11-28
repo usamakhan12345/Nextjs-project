@@ -1,5 +1,6 @@
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import randomstring from 'randomstring'
 export const bcryptPassword = (password: string) => {
   var salt = bcrypt.genSaltSync(10);
   var hashPassword = bcrypt.hashSync(password, salt);
@@ -26,3 +27,12 @@ export const assignJwtToken = (email: string, password: string) => {
   );
   return token;
 };
+
+
+export const optGenerator = (codeType : string  , length : number)=>{
+  return randomstring.generate({
+    length: 6,
+    charset: 'numeric'
+});
+
+}
