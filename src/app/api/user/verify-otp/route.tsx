@@ -6,7 +6,6 @@ export async function POST(request: Request) {
     const existOtp = await OtpModel.findOne({ email });
 
     if (existOtp) {
-      console.log("otpCode", existOtp);
       if (existOtp.otpCode === verifyCode) {
         await OtpModel.findOneAndDelete({ email });
 

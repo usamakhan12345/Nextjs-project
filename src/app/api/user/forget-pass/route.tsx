@@ -22,7 +22,7 @@ export async function POST(request: Request) {
 
     console.log("existOtp", existOtp);
 
-    if (existOtp) {
+    if (existOtp.length > 0) {
       await OtpModel.updateOne({ email }, { otpCode });
 
       return Response.json({
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
 
     return Response.json({
       status: "200",
-      message: "otp generate successfuly",
+      message: "new generate successfuly",
       otpCode: otpCode,
     });
   } catch (error) {
