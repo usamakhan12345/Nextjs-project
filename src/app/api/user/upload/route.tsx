@@ -1,68 +1,60 @@
-import fs from "fs-extra";
-import multer from "multer";
 import cloudinary from "cloudinary";
-import { nextConnect } from "next-connect";
+import streamifier from "streamifier";
 
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-ignore
 cloudinary.config({
-  cloud_name: "dnzgzlxxy",
-  api_key: "731957682875596",
-  api_secret: "DqETxXSmCfkIwd23LBmfAaR-hhw",
+  cloud_name: process.env.CLOUDINARY_CLOUD,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Configure Multer storage
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, "Images/"); // Folder for temporary storage
-  },
-  filename: function (req, file, cb) {
-    cb(null, file.originalname); // Use original filename
-  },
-});
+interface CloudinaryUploadResult {
+  secure_url: string;
+  public_id: string;
+  url: string;
+  [key: string]: any;
+}
 
-// Initialize multer with the storage configuration
-const upload = multer({ storage });
-
-// Initialize Next.js API route handler
-const handler = nextConnect();
-
-// Middleware to handle file upload
-handler.use(upload.single("file"));
-
-// POST request handler
-handler.post(async (req, res) => {
+export async function POST(request: Request) {
   try {
-    // Process uploaded files in the "Images/" folder
-    const files = fs.readdirSync("Images/");
-    for (const file of files) {
-      await cloudinary.v2.uploader.upload(
-        `Images/${file}`,
-        {},
-        (error, result) => {
-          if (error) {
-            return res.status(400).json({ message: "Invalid data", error });
-          }
+    const data = await request.formData();
+    const image = data.get("file");
 
-          // Remove file from the local filesystem after upload
-          fs.remove(`Images/${file}`, (err) => {
-            if (err) console.error("Error removing file:", err);
-          });
-
-          // Respond with the uploaded file URL
-          res.status(200).json({ message: "File uploaded", url: result?.url });
-        }
-      );
+    if (!image || !(image instanceof Blob)) {
+      return new Response(JSON.stringify({ message: "No image uploaded" }), {
+        status: 400,
+      });
     }
+
+    console.log("image---->", image);
+
+    // Convert Blob to Readable Stream
+    const buffer = Buffer.from(await image.arrayBuffer());
+    const uploadFromBuffer = (
+      buffer: Buffer
+    ): Promise<CloudinaryUploadResult> => {
+      return new Promise((resolve, reject) => {
+        const stream = cloudinary.v2.uploader.upload_stream((error, result) => {
+          if (error) return reject(error);
+          resolve(result as CloudinaryUploadResult);
+        });
+        streamifier.createReadStream(buffer).pipe(stream);
+      });
+    };
+
+    const { secure_url } = await uploadFromBuffer(buffer);
+
+    return new Response(
+      JSON.stringify({
+        message: "File uploaded successfully",
+        url: secure_url,
+      }),
+      { status: 200 }
+    );
   } catch (err) {
-    console.error("Error during file upload:", err);
-    res.status(500).json({ message: "File not uploaded", error: err?.message });
+    return new Response(JSON.stringify({ message: "File not uploaded" }), {
+      status: 500,
+    });
   }
-});
-
-// Disable body parsing by Next.js to handle file uploads
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
-
-export default handler;
+}
